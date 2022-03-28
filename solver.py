@@ -89,11 +89,14 @@ def encode_sequence():
     for idx, var in enumerate(new_var):
         # get the cell function
         r, c, v = decode_cell(var - num_var)
+        # first rule of sequential counter
         if idx + 1 == 1:
             cls.append([-cell(r, c, v), var])
+        # last rule of sequential counter
         elif idx + 1 == num_var - 1:
             r, c, v = decode_cell(var - num_var + 1)
             cls.append([-var, -cell(r, c, v)])
+        # every other rule of sequential counter
         else:
             cls.append([-cell(r, c, v), var])
             cls.append([-new_var[idx - 1], var])

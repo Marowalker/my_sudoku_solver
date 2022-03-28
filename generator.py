@@ -1,5 +1,7 @@
 from random import sample
 import pickle
+from sudoku import Sudoku
+
 
 
 def generate_from_base(base):
@@ -36,3 +38,16 @@ def generate_bulk(num_sample, base):
     size = str(base * base) + 'x' + str(base * base)
     with open('puzzles_' + size + '.pkl', 'wb') as f:
         pickle.dump(all_boards, f)
+
+
+def generate_from_package(base):
+    puzzle = Sudoku(base).difficulty(0.5)
+    board = puzzle.board
+    for i in range(len(board)):
+        for j in range(len(board[i])):
+            if board[i][j] is None:
+                board[i][j] = 0
+    return board
+
+
+# print(generate_from_package(6))
