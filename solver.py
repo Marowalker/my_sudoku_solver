@@ -1,4 +1,4 @@
-from pysat.solvers import Glucose3
+from pysat.solvers import Glucose3, Minisat22
 import numpy as np
 import time
 import constants
@@ -12,7 +12,7 @@ num_var = N * N * N
 
 # utility function to check for the use of the subgrid rule
 def is_square(i: int) -> bool:
-    return i == math.isqrt(i) ** 2
+    return i == math.sqrt(i) ** 2
 
 
 def import_problem_from_file(filename):
@@ -39,7 +39,7 @@ def decode_cell(var):
     r = int((var - 1) / (N * N))
     c = int((var - r * N * N - 1) / N)
     v = var - r * N * N - c * N
-    return r, c, v
+    return r + 1, c + 1, v
 
 
 # binomial (simple) encoding for the digit rule
@@ -79,21 +79,25 @@ def encode_sequence():
         for j in range(1, N + 1):
             # denotes (at least) one of the (N - 1) digits (1 clause)
             cls.append([cell(i, j, d) for d in range(1, N + 1)])
-            # does not denote two different digits at once (36 clauses)
+            # create variables s_i
             for d in range(1, N + 1):
                 new_var.append(cell(i, j, d) + num_var)
 
+    # since there is only N - 1 s_i variables, we drop the last element
     new_var = new_var[:-1]
-    for idx in range(num_var - 1):
-        r, c, v = decode_cell(new_var[idx])
+    # sequential counter encoding for N regular variables and N-1 s_i variables
+    for idx, var in enumerate(new_var):
+        # get the cell function
+        r, c, v = decode_cell(var - num_var)
         if idx + 1 == 1:
-            cls.append([-cell(r, c, v), new_var[idx]])
+            cls.append([-cell(r, c, v), var])
         elif idx + 1 == num_var - 1:
-            r, c, v = decode_cell(new_var[idx] + 1)
-            cls.append([-new_var[idx], -cell(r, c, v)])
+            r, c, v = decode_cell(var - num_var + 1)
+            cls.append([-var, -cell(r, c, v)])
         else:
-            cls.append([-cell(r, c, v), new_var[idx]])
-            cls.append([-new_var[idx - 1], new_var[idx]])
+            cls.append([-cell(r, c, v), var])
+            cls.append([-new_var[idx - 1], var])
+            cls.append([-new_var[idx - 1], -cell(r, c, v)])
 
     return cls
 
@@ -136,9 +140,9 @@ def encode_clauses(board):
             d = board[i - 1][j - 1]
             if d:
                 all_clauses.append([cell(i, j, d)])
-    unique_clauses = set(tuple(i) for i in all_clauses)
-    return [list(i) for i in unique_clauses]
-    # return all_clauses
+    # unique_clauses = set(tuple(i) for i in all_clauses)
+    # return [list(i) for i in unique_clauses]
+    return all_clauses
 
 
 def solve(board):
@@ -147,10 +151,11 @@ def solve(board):
     numclause = len(clauses)
     print("P CNF " + str(numclause) + " (number of clauses)")
     # solve the SAT problem
-    sol = Glucose3()
-    start = time.process_time()
+    # sol = Glucose3()
+    sol = Minisat22()
     for c in clauses:
         sol.add_clause(c)
+    start = time.process_time()
     sol.solve()
     end = time.process_time()
     t = end - start
@@ -166,10 +171,8 @@ def get_result(result):
         res = []
         for i in range(1, num_var + 1):
             if input_result[i - 1] > 0:
-                r = int((i - 1) / (N * N))
-                c = int((i - r * N * N - 1) / N)
-                v = i - r * N * N - c * N
-                res.append([r + 1, c + 1, v])
+                r, c, v = decode_cell(input_result[i - 1])
+                res.append([r, c, v])
         return res
 
     result = decode(result)
@@ -188,4 +191,4 @@ def get_result(result):
 # test_cells = [(1, 1), (2, 2), (3, 3)]
 # print(encode_sequence(test_cells))
 
-# encode_sequence()
+encode_sequence()
