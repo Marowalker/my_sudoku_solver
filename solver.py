@@ -3,6 +3,7 @@ import numpy as np
 import time
 import constants
 import math
+from pysat.card import *
 
 
 N = constants.BOARD_SIZE  # Size of the full board
@@ -85,23 +86,56 @@ def encode_sequence():
 
     # since there is only N - 1 s_i variables, we drop the last element
     new_var = new_var[:-1]
-    # sequential counter encoding for N regular variables and N-1 s_i variables
+    # sequential encounter encoding for N regular variables and N-1 s_i variables
     for idx, var in enumerate(new_var):
         # get the cell function
         r, c, v = decode_cell(var - num_var)
-        # first rule of sequential counter
+        # first rule of sequential encounter
         if idx + 1 == 1:
             cls.append([-cell(r, c, v), var])
-        # last rule of sequential counter
-        elif idx + 1 == num_var - 1:
-            r, c, v = decode_cell(var - num_var + 1)
-            cls.append([-var, -cell(r, c, v)])
-        # every other rule of sequential counter
+        # every other rule of sequential encounter
         else:
             cls.append([-cell(r, c, v), var])
             cls.append([-new_var[idx - 1], var])
             cls.append([-new_var[idx - 1], -cell(r, c, v)])
+            # last rule of sequential encounter
+            if idx + 1 == num_var - 1:
+                r, c, v = decode_cell(var - num_var + 1)
+                cls.append([-var, -cell(r, c, v)])
 
+    return cls
+
+
+def encode_sequence_fixed():
+    cls = []
+    for i in range(1, N + 1):
+        for j in range(1, N + 1):
+            # denotes (at least) one of the (N - 1) digits (1 clause)
+            cls.append([cell(i, j, d) for d in range(1, N + 1)])
+            for d in range(1, N + 1):
+                # create new variable s_i
+                s_i = cell(i, j, d) + num_var
+                if d == 1:
+                    cls.append([-cell(i, j, d), s_i])
+                else:
+                    s_i1 = cell(i, j, d - 1) + num_var
+                    if d == 9:
+                        cls.append([-s_i1, -cell(i, j, d)])
+                    else:
+                        cls.append([-cell(i, j, d), s_i])
+                        cls.append([-s_i1, s_i])
+                        cls.append([-s_i1, -cell(i, j, d)])
+    return cls
+
+
+def encode_sequence_with_package():
+    cls = []
+    for i in range(1, N + 1):
+        for j in range(1, N + 1):
+            # denotes (at least) one of the (N - 1) digits (1 clause)
+            cls.append([cell(i, j, d) for d in range(1, N + 1)])
+    cnf = CardEnc.atmost(lits=[i for i in range(1, num_var + 1)], encoding=EncType.seqcounter)
+    cls = cls + cnf.clauses
     return cls
 
 
@@ -135,7 +169,7 @@ def encode_clauses(board):
     # if subgrids exist in the board
     if is_square(len(board)):
         # all_clauses = encode_digit() + encode_row() + encode_col() + encode_subgrid()
-        all_clauses = encode_sequence() + encode_row() + encode_col() + encode_subgrid()
+        all_clauses = encode_sequence_fixed() + encode_row() + encode_col() + encode_subgrid()
     else:
         all_clauses = encode_sequence() + encode_row() + encode_col()
     for i in range(1, N + 1):
@@ -194,4 +228,13 @@ def get_result(result):
 # test_cells = [(1, 1), (2, 2), (3, 3)]
 # print(encode_sequence(test_cells))
 
-encode_sequence()
+cls = encode_sequence_fixed()
+print(len(cls))
+# cnf = encode_sequence_with_package()
+# print(len(cnf))
+# print(len(cls))
+# for c in cnf:
+#     if c not in cls and c.reverse() not in cls:
+#         print(c)
+
+

@@ -3,7 +3,6 @@ import pickle
 from sudoku import Sudoku
 
 
-
 def generate_from_base(base):
     side = base * base
 
