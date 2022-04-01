@@ -43,18 +43,35 @@ def decode_cell(var):
     return r + 1, c + 1, v
 
 
-# binomial (simple) encoding for the digit rule
-def encode_digit():
+# encoding for the digit rule
+def encode_digit(mode='normal'):
     cls = []
     # for all cells, ensure that the each cell:
     for i in range(1, N + 1):
         for j in range(1, N + 1):
             # denotes (at least) one of the (N - 1) digits (1 clause)
             cls.append([cell(i, j, d) for d in range(1, N + 1)])
-            # does not denote two different digits at once (36 clauses)
-            for d in range(1, N + 1):
-                for dp in range(d + 1, N + 1):
-                    cls.append([-cell(i, j, d), -cell(i, j, dp)])
+            # does not denote two different digits at once
+            # binomial encoding
+            if mode == 'normal':
+                for d in range(1, N + 1):
+                    for dp in range(d + 1, N + 1):
+                        cls.append([-cell(i, j, d), -cell(i, j, dp)])
+            # sequential encounter encoding
+            else:
+                for d in range(1, N + 1):
+                    # create new variable s_i
+                    s_i = cell(i, j, d) + num_var
+                    if d == 1:
+                        cls.append([-cell(i, j, d), s_i])
+                    else:
+                        s_i1 = cell(i, j, d - 1) + num_var
+                        if d == N:
+                            cls.append([-s_i1, -cell(i, j, d)])
+                        else:
+                            cls.append([-cell(i, j, d), s_i])
+                            cls.append([-s_i1, s_i])
+                            cls.append([-s_i1, -cell(i, j, d)])
     return cls
 
 
@@ -69,73 +86,6 @@ def encode_region(cells):
             # each pair does not denote the same digit; a.k.a only one digit can be present in a specified region
             for d in range(1, N + 1):
                 cls.append([-cell(x_i[0], x_i[1], d), -cell(x_j[0], x_j[1], d)])
-    return cls
-
-
-# sequential counter encoding for the digit rule
-def encode_sequence():
-    cls = []
-    new_var = []
-    for i in range(1, N + 1):
-        for j in range(1, N + 1):
-            # denotes (at least) one of the (N - 1) digits (1 clause)
-            cls.append([cell(i, j, d) for d in range(1, N + 1)])
-            # create variables s_i
-            for d in range(1, N + 1):
-                new_var.append(cell(i, j, d) + num_var)
-
-    # since there is only N - 1 s_i variables, we drop the last element
-    new_var = new_var[:-1]
-    # sequential encounter encoding for N regular variables and N-1 s_i variables
-    for idx, var in enumerate(new_var):
-        # get the cell function
-        r, c, v = decode_cell(var - num_var)
-        # first rule of sequential encounter
-        if idx + 1 == 1:
-            cls.append([-cell(r, c, v), var])
-        # every other rule of sequential encounter
-        else:
-            cls.append([-cell(r, c, v), var])
-            cls.append([-new_var[idx - 1], var])
-            cls.append([-new_var[idx - 1], -cell(r, c, v)])
-            # last rule of sequential encounter
-            if idx + 1 == num_var - 1:
-                r, c, v = decode_cell(var - num_var + 1)
-                cls.append([-var, -cell(r, c, v)])
-
-    return cls
-
-
-def encode_sequence_fixed():
-    cls = []
-    for i in range(1, N + 1):
-        for j in range(1, N + 1):
-            # denotes (at least) one of the (N - 1) digits (1 clause)
-            cls.append([cell(i, j, d) for d in range(1, N + 1)])
-            for d in range(1, N + 1):
-                # create new variable s_i
-                s_i = cell(i, j, d) + num_var
-                if d == 1:
-                    cls.append([-cell(i, j, d), s_i])
-                else:
-                    s_i1 = cell(i, j, d - 1) + num_var
-                    if d == 9:
-                        cls.append([-s_i1, -cell(i, j, d)])
-                    else:
-                        cls.append([-cell(i, j, d), s_i])
-                        cls.append([-s_i1, s_i])
-                        cls.append([-s_i1, -cell(i, j, d)])
-    return cls
-
-
-def encode_sequence_with_package():
-    cls = []
-    for i in range(1, N + 1):
-        for j in range(1, N + 1):
-            # denotes (at least) one of the (N - 1) digits (1 clause)
-            cls.append([cell(i, j, d) for d in range(1, N + 1)])
-    cnf = CardEnc.atmost(lits=[i for i in range(1, num_var + 1)], encoding=EncType.seqcounter)
-    cls = cls + cnf.clauses
     return cls
 
 
@@ -165,13 +115,12 @@ def encode_subgrid():
     return cls
 
 
-def encode_clauses(board):
+def encode_clauses(board, mode='normal'):
     # if subgrids exist in the board
     if is_square(len(board)):
-        # all_clauses = encode_digit() + encode_row() + encode_col() + encode_subgrid()
-        all_clauses = encode_sequence_fixed() + encode_row() + encode_col() + encode_subgrid()
+        all_clauses = encode_digit(mode) + encode_row() + encode_col() + encode_subgrid()
     else:
-        all_clauses = encode_sequence() + encode_row() + encode_col()
+        all_clauses = encode_digit(mode) + encode_row() + encode_col()
     for i in range(1, N + 1):
         for j in range(1, N + 1):
             d = board[i - 1][j - 1]
@@ -182,8 +131,8 @@ def encode_clauses(board):
     return all_clauses
 
 
-def solve(board):
-    clauses = encode_clauses(board)
+def solve(board, mode='normal'):
+    clauses = encode_clauses(board, mode)
     # Print number SAT clause
     numclause = len(clauses)
     print("P CNF " + str(numclause) + " (number of clauses)")
@@ -223,18 +172,5 @@ def get_result(result):
         result_sudoku[r - 1][c - 1] = val
 
     return result_sudoku
-
-
-# test_cells = [(1, 1), (2, 2), (3, 3)]
-# print(encode_sequence(test_cells))
-
-cls = encode_sequence_fixed()
-print(len(cls))
-# cnf = encode_sequence_with_package()
-# print(len(cnf))
-# print(len(cls))
-# for c in cnf:
-#     if c not in cls and c.reverse() not in cls:
-#         print(c)
 
 
