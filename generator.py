@@ -32,7 +32,7 @@ def generate_from_base(base):
 def generate_bulk(num_sample, base):
     all_boards = []
     for i in range(num_sample):
-        board = generate_from_base(base)
+        board = generate_from_package(base)
         all_boards.append(board)
     size = str(base * base) + 'x' + str(base * base)
     with open('puzzles_' + size + '.pkl', 'wb') as f:
